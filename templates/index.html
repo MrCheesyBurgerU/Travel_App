@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Diario de Viaje 🌍</title>
+  <title>Diario de Viaje · Nicolás &amp; Maca</title>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -15,10 +15,12 @@
 <aside id="sidebar">
   <div id="sidebar-header">
     <div id="header-top">
-      <h1>🗺️ Diario de Viaje</h1>
+      <div id="header-titles">
+        <h1>🗺️ Diario de Viaje</h1>
+        <span class="diary-owners">Nicolás &amp; Maca</span>
+      </div>
       <button id="auth-btn" title="Acceso admin">🔐</button>
     </div>
-    <p class="subtitle">Tu diario de aventuras</p>
   </div>
 
   <!-- Stats bar -->
@@ -136,6 +138,12 @@
       </div>
     </form>
   </div>
+</div>
+
+<!-- ── Auth toast ────────────────────────────────────────────── -->
+<div id="auth-toast" class="hidden">
+  <span>🔐 Inicia sesión para agregar lugares</span>
+  <button id="toast-login-btn">Iniciar sesión</button>
 </div>
 
 <!-- ── Hint ─────────────────────────────────────────────────── -->

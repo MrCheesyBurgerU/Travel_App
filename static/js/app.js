@@ -42,7 +42,7 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 L.control.zoom({ position: "bottomright" }).addTo(map);
 
 map.on("click", (ev) => {
-  if (currentRole !== "admin") return;
+  if (currentRole !== "admin") { showAuthToast(); return; }
   pendingLatLng = ev.latlng;
   openModal(null, ev.latlng.lat, ev.latlng.lng);
 });
@@ -83,7 +83,7 @@ function makeIcon(cat) {
 
 function entryCardHtml(e) {
   return `
-    <div class="entry-card cat-${e.category}" onclick="openView(${e.id})">
+    <div class="entry-card cat-${e.category}" data-category="${e.category}" onclick="openView(${e.id})">
       <div class="entry-card-header">
         <span class="entry-card-title">${CAT_EMOJI[e.category]} ${e.title}</span>
         <span class="entry-card-stars">${starsHtml(e.rating)}</span>
@@ -221,35 +221,99 @@ function renderList() {
 
   list.innerHTML = [...grouped.values()].map(group => {
     const { items } = group;
-    const avg  = (items.reduce((s, e) => s + e.rating, 0) / items.length).toFixed(1);
-    const n    = (cat) => items.filter(e => e.category === cat).length;
-    const food = n("food"), act = n("activity"), place = n("place");
-
-    // Only show categories that have at least one entry in this country
-    const cats = [
-      food  ? `🍽️ ${food}`  : null,
-      act   ? `🎉 ${act}`   : null,
-      place ? `📍 ${place}` : null,
-    ].filter(Boolean).join("<span class='cs'>·</span>");
-
     const total = items.length;
     const label = total === 1 ? "lugar" : "lugares";
+    const globalAvg = (items.reduce((s, e) => s + e.rating, 0) / total).toFixed(1);
+
+    // Per-category: count + average rating (only categories with entries)
+    const catStat = (cat, emoji) => {
+      const sub = items.filter(e => e.category === cat);
+      if (!sub.length) return null;
+      const avg = (sub.reduce((s, e) => s + e.rating, 0) / sub.length).toFixed(1);
+      return `<span class="ch-cat">${emoji} ${sub.length} <span class="ch-cat-avg">⭐${avg}</span></span>`;
+    };
+    const cats = [
+      catStat("food",     "🍽️"),
+      catStat("activity", "🎉"),
+      catStat("place",    "📍"),
+    ].filter(Boolean).join(`<span class="cs">·</span>`);
+
+    const hasCat  = (cat) => items.some(e => e.category === cat);
+    const ccBtn   = (cat, label) => hasCat(cat)
+      ? `<button class="cc-filter" data-cat="${cat}">${label}</button>`
+      : "";
 
     return `
       <div class="country-group">
         <div class="country-header">
           <div class="ch-row">
             <span class="country-name">${countryFlag(group.code)} ${group.label}</span>
-            <span class="country-count">${total} ${label}</span>
+            <span class="country-count">${total} ${label} · ⭐${globalAvg}</span>
           </div>
-          <div class="ch-stats">
-            <span class="ch-avg">⭐ ${avg}</span>
-            <span class="ch-cats">${cats}</span>
+          <div class="ch-stats">${cats}</div>
+          <div class="country-cat-filters">
+            <button class="cc-filter active" data-cat="all">Todos</button>
+            ${ccBtn("food",     "🍽️ Comida")}
+            ${ccBtn("activity", "🎉 Actividad")}
+            ${ccBtn("place",    "📍 Lugar")}
+          </div>
+          <div class="country-search-wrap">
+            <span class="country-search-icon">🔍</span>
+            <input class="country-search" type="text"
+                   placeholder="Buscar en ${group.label}…" autocomplete="off" />
+            <button class="country-search-clear hidden" tabindex="-1">✕</button>
           </div>
         </div>
         ${items.map(entryCardHtml).join("")}
+        <div class="country-no-results hidden">Sin resultados</div>
       </div>`;
   }).join("");
+}
+
+// ── Per-country search (event delegation — wired once, works for all groups) ──
+const entryList = document.getElementById("entry-list");
+
+entryList.addEventListener("input", (e) => {
+  if (e.target.classList.contains("country-search"))
+    filterGroup(e.target.closest(".country-group"));
+});
+
+entryList.addEventListener("click", (e) => {
+  // Clear search
+  if (e.target.classList.contains("country-search-clear")) {
+    const group = e.target.closest(".country-group");
+    group.querySelector(".country-search").value = "";
+    filterGroup(group);
+    return;
+  }
+  // Per-country category filter
+  if (e.target.classList.contains("cc-filter")) {
+    const group = e.target.closest(".country-group");
+    group.querySelectorAll(".cc-filter").forEach(b => b.classList.remove("active"));
+    e.target.classList.add("active");
+    group.dataset.catFilter = e.target.dataset.cat;
+    filterGroup(group);
+  }
+});
+
+function filterGroup(group) {
+  const q         = group.querySelector(".country-search")?.value.trim().toLowerCase() || "";
+  const catFilter = group.dataset.catFilter || "all";
+  const clearBtn  = group.querySelector(".country-search-clear");
+  const noResult  = group.querySelector(".country-no-results");
+
+  if (clearBtn) clearBtn.classList.toggle("hidden", !q);
+
+  let visible = 0;
+  group.querySelectorAll(".entry-card").forEach(card => {
+    const matchSearch = !q || card.textContent.toLowerCase().includes(q);
+    const matchCat    = catFilter === "all" || card.dataset.category === catFilter;
+    const show        = matchSearch && matchCat;
+    card.style.display = show ? "" : "none";
+    if (show) visible++;
+  });
+
+  if (noResult) noResult.classList.toggle("hidden", visible > 0);
 }
 
 function renderMarkers() {
@@ -575,7 +639,9 @@ function placeSearchMarker(lat, lng, locationName) {
     zIndexOffset: 1000,
   }).addTo(map);
 
-  const tooltip = "Clic para registrar — arrastra para ajustar";
+  const tooltip = currentRole === "admin"
+    ? "Clic para registrar — arrastra para ajustar"
+    : "Inicia sesión para registrar este lugar";
   const bindTip = () => searchMarker.bindTooltip(tooltip, {
     permanent: true, direction: "top",
     offset: [0, -42], className: "search-tooltip",
@@ -584,6 +650,7 @@ function placeSearchMarker(lat, lng, locationName) {
   bindTip();
 
   searchMarker.on("click", () => {
+    if (currentRole !== "admin") { showAuthToast(); return; }
     const pos  = searchMarker.getLatLng();
     const name = locationName.split(",").slice(0, 2).join(",").trim();
     map.removeLayer(searchMarker);
@@ -685,6 +752,20 @@ async function handleLogout() {
   applyRoleUI();
   render();
 }
+
+let toastTimer = null;
+
+function showAuthToast() {
+  const toast = document.getElementById("auth-toast");
+  toast.classList.remove("hidden", "toast-hide");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.add("toast-hide"), 4000);
+}
+
+document.getElementById("toast-login-btn").addEventListener("click", () => {
+  document.getElementById("auth-toast").classList.add("hidden");
+  openLoginModal();
+});
 
 // ═══════════════════════════════════════════════════════════════
 // HINT + INIT
