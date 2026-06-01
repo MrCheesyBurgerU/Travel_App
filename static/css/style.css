@@ -43,8 +43,79 @@ body {
   border-bottom: 1px solid var(--surface2);
 }
 
+#header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 #sidebar-header h1 { font-size: 1.3rem; font-weight: 700; }
 .subtitle { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+
+#auth-btn {
+  background: none;
+  border: 1px solid var(--surface2);
+  color: var(--muted);
+  font-size: 0.78rem;
+  padding: 4px 10px;
+  border-radius: 20px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.15s;
+}
+#auth-btn:hover { border-color: var(--accent); color: var(--text); }
+#auth-btn.auth-admin {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ── Login modal ────────────────────────────────────────────── */
+#login-modal {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 28px 28px 22px;
+  width: min(96vw, 360px);
+  border: 1px solid var(--surface2);
+  box-shadow: 0 24px 60px #0008;
+}
+
+#login-modal h2 { margin-bottom: 18px; font-size: 1.1rem; }
+
+#login-modal label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin: 12px 0 5px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+#login-modal input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid #475569;
+  border-radius: 8px;
+  color: var(--text);
+  padding: 9px 12px;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+#login-modal input:focus { border-color: var(--accent); }
+
+#login-error {
+  margin-top: 10px;
+  font-size: 0.8rem;
+  color: var(--danger);
+  background: rgba(239,68,68,0.1);
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+
+#login-submit-btn { background: var(--accent); color: #000; }
+#login-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 /* Stats bar */
 #stats {
@@ -188,15 +259,7 @@ body {
 .country-group { margin-bottom: 6px; }
 
 .country-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px 5px;
-  font-size: 0.72rem;
-  font-weight: 700;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
+  padding: 7px 10px 6px;
   border-bottom: 1px solid var(--surface2);
   margin-bottom: 6px;
   position: sticky;
@@ -205,12 +268,54 @@ body {
   z-index: 1;
 }
 
+/* Row 1: flag + name | total count */
+.ch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.country-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
 .country-count {
   background: var(--surface2);
   border-radius: 10px;
   padding: 1px 8px;
   font-size: 0.68rem;
   font-weight: 600;
+  color: var(--text);
+}
+
+/* Row 2: avg rating | category counts */
+.ch-stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.74rem;
+}
+
+.ch-avg {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.ch-cats {
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cs {
+  color: var(--surface2);
+  font-size: 0.8rem;
 }
 
 .empty-state {

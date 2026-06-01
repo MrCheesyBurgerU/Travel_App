@@ -1,41 +1,38 @@
 import os
 import secrets
+from datetime import timedelta
 from functools import wraps
-from flask import Flask, render_template, request, jsonify, Response
+from flask import Flask, render_template, request, jsonify, session
 import sqlite3
 
 # ── Config ────────────────────────────────────────────────────
-# In production set these via environment variables / fly secrets
 DB         = os.environ.get("DB_PATH", "diary.db")
 DEBUG      = os.environ.get("FLASK_DEBUG", "1") == "1"
-DIARY_USER = os.environ.get("DIARY_USER", "")   # leave empty to disable auth
+DIARY_USER = os.environ.get("DIARY_USER", "")
 DIARY_PASS = os.environ.get("DIARY_PASS", "")
+# SECRET_KEY must be stable across restarts for sessions to survive.
+# Set it once with: fly secrets set SECRET_KEY=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+SECRET_KEY = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 
 app = Flask(__name__)
+app.secret_key = SECRET_KEY
+app.permanent_session_lifetime = timedelta(days=7)
 
 
 # ── Auth ──────────────────────────────────────────────────────
-def _unauthorized():
-    return Response(
-        "Acceso restringido",
-        401,
-        {"WWW-Authenticate": 'Basic realm="Diario de Viaje"'},
-    )
+def get_role():
+    """Return 'admin' or 'viewer'. No credentials configured → always admin (local dev)."""
+    if not DIARY_USER:
+        return "admin"
+    return session.get("role", "viewer")
 
 
-def require_auth(f):
-    """HTTP Basic Auth gate — skipped if DIARY_USER/DIARY_PASS are not set."""
+def require_admin(f):
+    """Reject non-admin requests with 403."""
     @wraps(f)
     def decorated(*args, **kwargs):
-        if not DIARY_USER or not DIARY_PASS:
-            return f(*args, **kwargs)
-        auth = request.authorization
-        if not auth:
-            return _unauthorized()
-        user_ok = secrets.compare_digest(auth.username, DIARY_USER)
-        pass_ok = secrets.compare_digest(auth.password, DIARY_PASS)
-        if not (user_ok and pass_ok):
-            return _unauthorized()
+        if get_role() != "admin":
+            return jsonify({"error": "Acceso restringido — inicia sesión como admin"}), 403
         return f(*args, **kwargs)
     return decorated
 
@@ -48,7 +45,8 @@ def get_db():
 
 
 def init_db():
-    os.makedirs(os.path.dirname(DB), exist_ok=True) if os.path.dirname(DB) else None
+    if os.path.dirname(DB):
+        os.makedirs(os.path.dirname(DB), exist_ok=True)
     with get_db() as conn:
         conn.execute("""
             CREATE TABLE IF NOT EXISTS entries (
@@ -65,7 +63,6 @@ def init_db():
                 created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        # Non-destructive migrations for existing databases
         for col, typedef in [("country", "TEXT"), ("country_code", "TEXT")]:
             try:
                 conn.execute(f"ALTER TABLE entries ADD COLUMN {col} {typedef}")
@@ -73,15 +70,44 @@ def init_db():
                 pass
 
 
-# ── Routes ────────────────────────────────────────────────────
+# ── Auth routes ───────────────────────────────────────────────
+@app.route("/api/me", methods=["GET"])
+def me():
+    return jsonify({"role": get_role()})
+
+
+@app.route("/api/login", methods=["POST"])
+def login():
+    # No credentials configured → grant admin immediately (local dev)
+    if not DIARY_USER:
+        session.permanent = True
+        session["role"] = "admin"
+        return jsonify({"role": "admin"})
+
+    data = request.json or {}
+    user_ok = secrets.compare_digest(data.get("username", ""), DIARY_USER)
+    pass_ok = secrets.compare_digest(data.get("password", ""), DIARY_PASS)
+    if user_ok and pass_ok:
+        session.permanent = True
+        session["role"] = "admin"
+        return jsonify({"role": "admin"})
+
+    return jsonify({"error": "Usuario o contraseña incorrectos"}), 401
+
+
+@app.route("/api/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return jsonify({"role": "viewer"})
+
+
+# ── App routes ────────────────────────────────────────────────
 @app.route("/")
-@require_auth
 def index():
     return render_template("index.html")
 
 
 @app.route("/api/entries", methods=["GET"])
-@require_auth
 def get_entries():
     with get_db() as conn:
         rows = conn.execute(
@@ -91,7 +117,7 @@ def get_entries():
 
 
 @app.route("/api/entries", methods=["POST"])
-@require_auth
+@require_admin
 def add_entry():
     data = request.json
     if not data or not data.get("title"):
@@ -122,7 +148,7 @@ def add_entry():
 
 
 @app.route("/api/entries/<int:entry_id>", methods=["PUT"])
-@require_auth
+@require_admin
 def update_entry(entry_id):
     data = request.json
     if not data or not data.get("title"):
@@ -151,7 +177,7 @@ def update_entry(entry_id):
 
 
 @app.route("/api/entries/<int:entry_id>", methods=["DELETE"])
-@require_auth
+@require_admin
 def delete_entry(entry_id):
     with get_db() as conn:
         if not conn.execute("SELECT id FROM entries WHERE id=?", (entry_id,)).fetchone():
@@ -161,6 +187,7 @@ def delete_entry(entry_id):
 
 
 # ── Entry point ───────────────────────────────────────────────
+init_db()
+
 if __name__ == "__main__":
-    init_db()
     app.run(debug=DEBUG, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))

@@ -14,7 +14,10 @@
 <!-- ── Sidebar ──────────────────────────────────────────────── -->
 <aside id="sidebar">
   <div id="sidebar-header">
-    <h1>🗺️ Diario de Viaje</h1>
+    <div id="header-top">
+      <h1>🗺️ Diario de Viaje</h1>
+      <button id="auth-btn" title="Acceso admin">🔐</button>
+    </div>
     <p class="subtitle">Tu diario de aventuras</p>
   </div>
 
@@ -22,12 +25,7 @@
   <div id="stats">
     <div class="stat-item">
       <span class="stat-num" id="stat-total">0</span>
-      <span class="stat-label">entradas</span>
-    </div>
-    <div class="stat-sep">·</div>
-    <div class="stat-item">
-      <span class="stat-num" id="stat-avg">—</span>
-      <span class="stat-label">promedio ⭐</span>
+      <span class="stat-label">lugares visitados</span>
     </div>
     <div class="stat-sep">·</div>
     <div class="stat-item">
@@ -119,6 +117,24 @@
       <button id="view-delete-btn" class="danger">Eliminar</button>
       <button id="view-edit-btn">Editar</button>
     </div>
+  </div>
+</div>
+
+<!-- ── Login Modal ──────────────────────────────────────────── -->
+<div id="login-overlay" class="hidden">
+  <div id="login-modal">
+    <h2>Acceso Admin</h2>
+    <form id="login-form">
+      <label>Usuario</label>
+      <input type="text" id="login-user" autocomplete="username" placeholder="usuario" />
+      <label>Contraseña</label>
+      <input type="password" id="login-pass" autocomplete="current-password" placeholder="••••••••" />
+      <div id="login-error" class="hidden">Usuario o contraseña incorrectos</div>
+      <div class="modal-actions">
+        <button type="button" id="login-cancel-btn">Cancelar</button>
+        <button type="submit" id="login-submit-btn">Entrar</button>
+      </div>
+    </form>
   </div>
 </div>
 

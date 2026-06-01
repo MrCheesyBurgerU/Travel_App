@@ -25,6 +25,7 @@ let markers        = {};        // entry.id → Leaflet marker
 let pendingLatLng  = null;
 let pendingCountry = null;      // resolved by reverse-geocode or Nominatim search
 let pendingCountryCode = null;
+let currentRole    = "admin";   // updated after /api/me resolves
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -41,6 +42,7 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
 L.control.zoom({ position: "bottomright" }).addTo(map);
 
 map.on("click", (ev) => {
+  if (currentRole !== "admin") return;
   pendingLatLng = ev.latlng;
   openModal(null, ev.latlng.lat, ev.latlng.lng);
 });
@@ -108,10 +110,31 @@ async function apiFetch(path, options = {}) {
 }
 
 async function fetchEntries() {
-  entries = await apiFetch("/api/entries");
+  // Resolve role and entries in parallel
+  const [roleData, data] = await Promise.all([
+    apiFetch("/api/me").catch(() => ({ role: "admin" })),
+    apiFetch("/api/entries"),
+  ]);
+  currentRole = roleData.role;
+  entries = data;
+  applyRoleUI();
   render();
-  // On load: fit map to existing entries, otherwise try geolocation
   entries.length > 0 ? fitToEntries() : tryGeolocation();
+}
+
+function applyRoleUI() {
+  const btn = document.getElementById("auth-btn");
+  if (currentRole === "admin") {
+    btn.textContent = "⎋ Salir";
+    btn.classList.add("auth-admin");
+    document.getElementById("map").style.cursor = "";
+    document.getElementById("hint").style.display = "";
+  } else {
+    btn.textContent = "🔐";
+    btn.classList.remove("auth-admin");
+    document.getElementById("map").style.cursor = "grab";
+    document.getElementById("hint").style.display = "none";
+  }
 }
 
 const saveEntry   = (data) => apiFetch("/api/entries", { method: "POST", body: JSON.stringify(data) });
@@ -156,11 +179,9 @@ function render() {
 
 function renderStats() {
   const total     = entries.length;
-  const avg       = total ? entries.reduce((s, e) => s + e.rating, 0) / total : null;
   const countries = new Set(entries.map(e => e.country).filter(Boolean)).size;
 
   document.getElementById("stat-total").textContent     = total;
-  document.getElementById("stat-avg").textContent       = avg ? avg.toFixed(1) : "—";
   document.getElementById("stat-countries").textContent = countries;
 
   ["all", "food", "activity", "place"].forEach(cat => {
@@ -184,23 +205,13 @@ function renderList() {
     return;
   }
 
-  // Count countries that have data to decide whether to group
-  const countriesWithData = new Set(filtered.map(e => e.country).filter(Boolean));
-
-  if (countriesWithData.size <= 1) {
-    // Single country (or no country info yet): plain flat list
-    list.innerHTML = filtered.map(entryCardHtml).join("");
-    return;
-  }
-
-  // Multiple countries: group by country, preserving recency order
-  // (entries are already sorted newest-first from the API)
+  // Group by country, preserving recency order (API returns newest-first)
   const grouped = new Map();
   for (const e of filtered) {
     const key = e.country || "__none__";
     if (!grouped.has(key)) {
       grouped.set(key, {
-        label: e.country     || "Sin país",
+        label: e.country      || "Sin país",
         code:  e.country_code || null,
         items: [],
       });
@@ -208,15 +219,37 @@ function renderList() {
     grouped.get(key).items.push(e);
   }
 
-  list.innerHTML = [...grouped.values()].map(group => `
-    <div class="country-group">
-      <div class="country-header">
-        <span>${countryFlag(group.code)} ${group.label}</span>
-        <span class="country-count">${group.items.length}</span>
-      </div>
-      ${group.items.map(entryCardHtml).join("")}
-    </div>
-  `).join("");
+  list.innerHTML = [...grouped.values()].map(group => {
+    const { items } = group;
+    const avg  = (items.reduce((s, e) => s + e.rating, 0) / items.length).toFixed(1);
+    const n    = (cat) => items.filter(e => e.category === cat).length;
+    const food = n("food"), act = n("activity"), place = n("place");
+
+    // Only show categories that have at least one entry in this country
+    const cats = [
+      food  ? `🍽️ ${food}`  : null,
+      act   ? `🎉 ${act}`   : null,
+      place ? `📍 ${place}` : null,
+    ].filter(Boolean).join("<span class='cs'>·</span>");
+
+    const total = items.length;
+    const label = total === 1 ? "lugar" : "lugares";
+
+    return `
+      <div class="country-group">
+        <div class="country-header">
+          <div class="ch-row">
+            <span class="country-name">${countryFlag(group.code)} ${group.label}</span>
+            <span class="country-count">${total} ${label}</span>
+          </div>
+          <div class="ch-stats">
+            <span class="ch-avg">⭐ ${avg}</span>
+            <span class="ch-cats">${cats}</span>
+          </div>
+        </div>
+        ${items.map(entryCardHtml).join("")}
+      </div>`;
+  }).join("");
 }
 
 function renderMarkers() {
@@ -346,6 +379,10 @@ function openView(id) {
   document.getElementById("view-stars").textContent       = starsHtml(e.rating) + ` (${e.rating}/5)`;
   document.getElementById("view-description").textContent = e.description || "Sin notas.";
   document.getElementById("view-date").textContent        = "Agregado el " + formatDate(e.created_at);
+
+  const isAdmin = currentRole === "admin";
+  document.getElementById("view-delete-btn").classList.toggle("hidden", !isAdmin);
+  document.getElementById("view-edit-btn").classList.toggle("hidden", !isAdmin);
 
   document.getElementById("view-overlay").classList.remove("hidden");
   map.panTo([e.lat, e.lng]);
@@ -576,6 +613,78 @@ function clearSearch() {
   if (searchMarker) { map.removeLayer(searchMarker); searchMarker = null; }
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+// LOGIN / LOGOUT
+// ═══════════════════════════════════════════════════════════════
+
+document.getElementById("auth-btn").addEventListener("click", () => {
+  if (currentRole === "admin") {
+    handleLogout();
+  } else {
+    openLoginModal();
+  }
+});
+
+function openLoginModal() {
+  document.getElementById("login-user").value = "";
+  document.getElementById("login-pass").value = "";
+  document.getElementById("login-error").classList.add("hidden");
+  document.getElementById("login-overlay").classList.remove("hidden");
+  document.getElementById("login-user").focus();
+}
+
+function closeLoginModal() {
+  document.getElementById("login-overlay").classList.add("hidden");
+}
+
+document.getElementById("login-cancel-btn").addEventListener("click", closeLoginModal);
+document.getElementById("login-overlay").addEventListener("click", (e) => {
+  if (e.target === document.getElementById("login-overlay")) closeLoginModal();
+});
+
+document.getElementById("login-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById("login-submit-btn");
+  btn.disabled = true;
+  btn.textContent = "Entrando…";
+
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: document.getElementById("login-user").value,
+        password: document.getElementById("login-pass").value,
+      }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      currentRole = data.role;
+      applyRoleUI();
+      closeLoginModal();
+      render(); // refresh buttons in open view modal if any
+    } else {
+      document.getElementById("login-error").textContent = data.error || "Error al iniciar sesión";
+      document.getElementById("login-error").classList.remove("hidden");
+      document.getElementById("login-pass").value = "";
+      document.getElementById("login-pass").focus();
+    }
+  } catch {
+    document.getElementById("login-error").textContent = "Error de conexión";
+    document.getElementById("login-error").classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Entrar";
+  }
+});
+
+async function handleLogout() {
+  await fetch("/api/logout", { method: "POST" }).catch(() => {});
+  currentRole = "viewer";
+  applyRoleUI();
+  render();
+}
 
 // ═══════════════════════════════════════════════════════════════
 // HINT + INIT
