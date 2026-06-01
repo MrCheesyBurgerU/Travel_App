@@ -1,5 +1,5 @@
 # Generated for Travel Diary — edit app name before deploying
-app            = "travel-diary-nico"   # ← change to something unique
+app            = "travel-diary-mrcheesyburger"   # ← change to something unique
 primary_region = "dfw"                 # Dallas — closest to Mexico
 
 [build]
