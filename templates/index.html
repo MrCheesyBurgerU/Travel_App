@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Diario de Viaje 🌍</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+<!-- ── Sidebar ──────────────────────────────────────────────── -->
+<aside id="sidebar">
+  <div id="sidebar-header">
+    <h1>🗺️ Diario de Viaje</h1>
+    <p class="subtitle">Tu diario de aventuras</p>
+  </div>
+
+  <!-- Stats bar -->
+  <div id="stats">
+    <div class="stat-item">
+      <span class="stat-num" id="stat-total">0</span>
+      <span class="stat-label">entradas</span>
+    </div>
+    <div class="stat-sep">·</div>
+    <div class="stat-item">
+      <span class="stat-num" id="stat-avg">—</span>
+      <span class="stat-label">promedio ⭐</span>
+    </div>
+    <div class="stat-sep">·</div>
+    <div class="stat-item">
+      <span class="stat-num" id="stat-countries">0</span>
+      <span class="stat-label">países</span>
+    </div>
+  </div>
+
+  <!-- Filters with count badges -->
+  <div id="filters">
+    <button class="filter-btn active" data-cat="all">Todos <span class="badge" id="badge-all"></span></button>
+    <button class="filter-btn" data-cat="food">🍽️ Comida <span class="badge" id="badge-food"></span></button>
+    <button class="filter-btn" data-cat="activity">🎉 Actividad <span class="badge" id="badge-activity"></span></button>
+    <button class="filter-btn" data-cat="place">📍 Lugar <span class="badge" id="badge-place"></span></button>
+  </div>
+
+  <!-- Entry list -->
+  <div id="entry-list"></div>
+</aside>
+
+<!-- ── Map ──────────────────────────────────────────────────── -->
+<div id="map"></div>
+
+<!-- ── Map search bar ───────────────────────────────────────── -->
+<div id="map-search">
+  <div id="search-box">
+    <span id="search-icon">🔍</span>
+    <input type="text" id="search-input" placeholder="Buscar un lugar o pegar coordenadas…" autocomplete="off" spellcheck="false" />
+    <button id="search-clear" class="hidden" title="Limpiar">✕</button>
+  </div>
+  <ul id="search-results" class="hidden"></ul>
+</div>
+
+<!-- ── New / Edit Entry Modal ───────────────────────────────── -->
+<div id="modal-overlay" class="hidden">
+  <div id="modal">
+    <h2 id="modal-title">Nueva entrada</h2>
+    <form id="entry-form">
+      <input type="hidden" id="edit-id" />
+      <input type="hidden" id="lat" />
+      <input type="hidden" id="lng" />
+
+      <label>Título</label>
+      <input type="text" id="title" placeholder="ej. Los mejores tacos" required />
+
+      <label>Nombre del lugar <span class="optional">(opcional)</span></label>
+      <input type="text" id="location-name" placeholder="ej. Mercado Roma, CDMX" />
+
+      <label>Categoría</label>
+      <div class="cat-group">
+        <label class="cat-opt"><input type="radio" name="category" value="food" checked /> 🍽️ Comida</label>
+        <label class="cat-opt"><input type="radio" name="category" value="activity" /> 🎉 Actividad</label>
+        <label class="cat-opt"><input type="radio" name="category" value="place" /> 📍 Lugar</label>
+      </div>
+
+      <label>Calificación</label>
+      <div class="star-row" id="star-input">
+        <span class="star" data-v="1">★</span>
+        <span class="star" data-v="2">★</span>
+        <span class="star" data-v="3">★</span>
+        <span class="star" data-v="4">★</span>
+        <span class="star" data-v="5">★</span>
+      </div>
+      <input type="hidden" id="rating" value="3" />
+
+      <label>Notas</label>
+      <textarea id="description" rows="3" placeholder="¿Qué te pareció? ¿Cómo estuvo?"></textarea>
+
+      <div class="modal-actions">
+        <button type="button" id="cancel-btn">Cancelar</button>
+        <button type="submit" id="save-btn">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ── View Entry Modal ──────────────────────────────────────── -->
+<div id="view-overlay" class="hidden">
+  <div id="view-modal">
+    <button id="close-view">✕</button>
+    <div id="view-cat-badge"></div>
+    <h2 id="view-title"></h2>
+    <div id="view-location"></div>
+    <div id="view-country"></div>
+    <div id="view-stars"></div>
+    <p id="view-description"></p>
+    <div id="view-date"></div>
+    <div class="modal-actions">
+      <button id="view-delete-btn" class="danger">Eliminar</button>
+      <button id="view-edit-btn">Editar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Hint ─────────────────────────────────────────────────── -->
+<div id="hint">Haz clic en el mapa para agregar una entrada</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
