@@ -1,0 +1,30 @@
+# Generated for Travel Diary — edit app name before deploying
+app            = "travel-diary-nico"   # ← change to something unique
+primary_region = "dfw"                 # Dallas — closest to Mexico
+
+[build]
+
+[env]
+  PORT    = "8080"
+  DB_PATH = "/data/diary.db"   # persistent volume mount
+
+[http_service]
+  internal_port       = 8080
+  force_https         = true
+  auto_stop_machines  = "stop"
+  auto_start_machines = true
+  min_machines_running = 0     # scales to zero when idle (free tier friendly)
+
+  [http_service.concurrency]
+    type       = "connections"
+    hard_limit = 25
+    soft_limit = 20
+
+[[mounts]]
+  source      = "diary_data"   # volume name — created in step 4 of deploy guide
+  destination = "/data"
+
+[[vm]]
+  memory   = "256mb"
+  cpu_kind = "shared"
+  cpus     = 1

@@ -1,22 +1,18 @@
-# Travel Diary
+# Diario de Viaje
 
-A lightweight personal travel diary app built with Python and Flask. Pin places on an interactive map, log what you ate or did, rate your experiences, and keep a persistent record of your adventures.
-
-Built for a 2-month trip through Mexico 🇲🇽, coming from Colombia 🇨🇴.
-
-![screenshot](https://raw.githubusercontent.com/placeholder/screenshot.png)
+A lightweight personal travel diary. Pin places on an interactive map, log what you ate or did, rate experiences, and keep a persistent record — accessible from any device, anywhere.
 
 ---
 
 ## Features
 
-- **Interactive map** — click anywhere to drop a pin and create a new entry
-- **Place search** — search for any location (powered by OpenStreetMap / Nominatim), fly to it, and drag the marker to fine-tune the spot
-- **Diary entries** — title, free-text notes, category, and a 1–5 star rating
-- **Three categories** — Food 🍽️, Activity 🎉, Place 📍 — each with its own color-coded pin
-- **Sidebar with filters** — browse all entries or filter by category
-- **Click any card or pin** — view full details, edit, or delete
-- **Persistent storage** — SQLite database, survives restarts with no setup required
+- **Interactive map** — click anywhere to drop a pin and log an entry
+- **Place search** — search by name or paste coordinates directly from Google Maps
+- **Three categories** — Comida 🍽️, Actividad 🎉, Lugar 📍 with color-coded pins
+- **1–5 star rating** and free-text notes
+- **Grouped by country** — entries auto-group when you visit multiple countries
+- **Stats bar** — total entries, average rating, countries visited
+- **Password protected** — HTTP Basic Auth when deployed to the cloud
 
 ---
 
@@ -25,59 +21,104 @@ Built for a 2-month trip through Mexico 🇲🇽, coming from Colombia 🇨🇴.
 | Layer | Technology |
 |---|---|
 | Backend | Python 3 + Flask |
-| Database | SQLite (via Python's built-in `sqlite3`) |
-| Map | Leaflet.js 1.9 (via CDN) |
+| Database | SQLite (built-in `sqlite3`) |
+| Production server | Gunicorn |
+| Map | Leaflet.js 1.9 (CDN) |
 | Geocoding | Nominatim / OpenStreetMap (free, no API key) |
-| Frontend | Vanilla HTML, CSS, JavaScript |
+| Hosting | Fly.io |
 
-No npm, no build step, no external services.
+No npm, no build step.
 
 ---
 
-## Getting started
-
-### 1. Clone the repo
+## Running locally
 
 ```bash
-git clone <your-repo-url>
-cd Travel_App
-```
-
-### 2. Create a virtual environment (optional but recommended)
-
-```bash
+# 1. Create and activate a virtual environment
 python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-```
 
-### 3. Install dependencies
-
-```bash
+# 2. Install dependencies
 pip install -r requirements.txt
-```
 
-### 4. Run
-
-```bash
+# 3. Run
 python app.py
 ```
 
-Open [http://localhost:5000](http://localhost:5000) in your browser.
-
-The SQLite database (`diary.db`) is created automatically on first run.
+Open [http://localhost:5000](http://localhost:5000). The database (`diary.db`) is created automatically.
 
 ---
 
-## How to use
+## Deploying to Fly.io (cloud — access from phone/anywhere)
 
-| Action | How |
-|---|---|
-| Add an entry | Click anywhere on the map |
-| Search a place | Type in the search bar at the top of the map |
-| Fine-tune a searched location | Drag the cyan pulsing marker before clicking it |
-| View an entry | Click a card in the sidebar or a pin on the map |
-| Edit / Delete | Open an entry and use the buttons at the bottom |
-| Filter by category | Use the All / Food / Activity / Place buttons |
+### Prerequisites
+
+```bash
+# Install the Fly CLI (macOS/Linux)
+curl -L https://fly.io/install.sh | sh
+
+# Create a free account and log in
+fly auth login
+```
+
+### First deploy
+
+**1. Edit `fly.toml`** — change the `app` name to something unique (e.g. `travel-diary-juan`):
+```toml
+app = "travel-diary-juan"
+```
+
+**2. Register the app with Fly:**
+```bash
+fly apps create travel-diary-juan
+```
+
+**3. Create a persistent volume for the database** (1 GB, free tier):
+```bash
+fly volumes create diary_data --size 1 --region dfw
+```
+
+**4. Set your login credentials** (these are stored as encrypted secrets, never in code):
+```bash
+fly secrets set DIARY_USER=tuusuario DIARY_PASS=tucontraseña
+```
+
+**5. Deploy:**
+```bash
+fly deploy
+```
+
+**6. Open your diary in the browser:**
+```bash
+fly open
+```
+
+Your diary is now live at `https://travel-diary-juan.fly.dev` — open it from your phone, any browser, anywhere.
+
+### Subsequent deploys
+
+Any time you make changes to the code, just run:
+```bash
+fly deploy
+```
+
+Data in the volume (`/data/diary.db`) is never touched by deploys.
+
+### Useful commands
+
+```bash
+fly logs                          # view live server logs
+fly ssh console                   # SSH into the running machine
+fly volumes list                  # check volume status
+fly secrets list                  # list secret names (values are hidden)
+fly secrets set DIARY_PASS=nuevo  # change password
+```
+
+### How auth works
+
+- If `DIARY_USER` and `DIARY_PASS` are set → the browser will ask for credentials on every new session
+- If neither is set (local dev) → auth is skipped entirely
+- Credentials are compared with `secrets.compare_digest` to prevent timing attacks
 
 ---
 
@@ -85,28 +126,31 @@ The SQLite database (`diary.db`) is created automatically on first run.
 
 ```
 Travel_App/
-├── app.py              # Flask app + SQLite API
-├── requirements.txt
-├── diary.db            # Auto-created on first run
+├── app.py              # Flask app, API routes, auth
+├── requirements.txt    # flask, gunicorn
+├── Dockerfile          # container definition for Fly.io
+├── fly.toml            # Fly.io configuration (region, volume, scaling)
+├── .dockerignore
+├── .gitignore
 ├── templates/
 │   └── index.html
 └── static/
-    ├── css/
-    │   └── style.css
-    └── js/
-        └── app.js
+    ├── css/style.css
+    └── js/app.js
 ```
 
 ---
 
-## API endpoints
+## API reference
+
+All endpoints require Basic Auth when `DIARY_USER`/`DIARY_PASS` are set.
 
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/` | Serve the app |
-| `GET` | `/api/entries` | List all diary entries |
+| `GET` | `/api/entries` | List all entries (newest first) |
 | `POST` | `/api/entries` | Create a new entry |
-| `PUT` | `/api/entries/<id>` | Update an existing entry |
+| `PUT` | `/api/entries/<id>` | Update an entry |
 | `DELETE` | `/api/entries/<id>` | Delete an entry |
 
 ### Entry schema
@@ -114,13 +158,15 @@ Travel_App/
 ```json
 {
   "id": 1,
-  "title": "Best tacos al pastor",
-  "description": "Incredible al pastor, the pineapple makes it.",
+  "title": "Tacos al pastor",
+  "description": "Increíbles, con piña.",
   "category": "food",
   "rating": 5,
   "lat": 19.4284,
   "lng": -99.1276,
   "location_name": "Mercado Roma, CDMX",
+  "country": "México",
+  "country_code": "MX",
   "created_at": "2026-05-31 18:00:00"
 }
 ```
@@ -129,6 +175,6 @@ Travel_App/
 
 ## Notes
 
-- Nominatim (the geocoding service) has a rate limit of 1 request/second. The search bar debounces input at 420 ms to stay well within that limit.
-- The app runs in Flask's development mode by default. For any kind of shared or remote deployment, put it behind a production WSGI server like Gunicorn.
-- The database file `diary.db` is excluded from version control by default — add it to `.gitignore` if you want to keep your diary private.
+- **SQLite + single worker** — Gunicorn is configured with `--workers 1`. SQLite doesn't support concurrent writes across processes, so running multiple workers would cause database errors.
+- **Scaling to zero** — `auto_stop_machines = "stop"` in `fly.toml` means the machine stops when idle and starts on the next request. Cold start is ~2 seconds. Keeps usage within the free tier.
+- **Nominatim rate limit** — the search bar debounces at 420 ms to stay under 1 req/s as required by Nominatim's terms.
