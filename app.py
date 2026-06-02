@@ -104,7 +104,7 @@ def logout():
 # ── App routes ────────────────────────────────────────────────
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", auth_enabled=bool(DIARY_USER))
 
 
 @app.route("/api/entries", methods=["GET"])

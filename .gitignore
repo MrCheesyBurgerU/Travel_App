@@ -1,6 +1,3 @@
-# Database (personal data — keep private)
-diary.db
-
 # Python
 __pycache__/
 *.pyc

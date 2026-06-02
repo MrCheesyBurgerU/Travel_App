@@ -685,7 +685,7 @@ function clearSearch() {
 // LOGIN / LOGOUT
 // ═══════════════════════════════════════════════════════════════
 
-document.getElementById("auth-btn").addEventListener("click", () => {
+document.getElementById("auth-btn")?.addEventListener("click", () => {
   if (currentRole === "admin") {
     handleLogout();
   } else {
