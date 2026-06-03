@@ -123,15 +123,13 @@ async function fetchEntries() {
 }
 
 function applyRoleUI() {
-  const btn = document.getElementById("auth-btn");
+  const btn = document.getElementById("auth-btn"); // null when auth is disabled locally
   if (currentRole === "admin") {
-    btn.textContent = "⎋ Salir";
-    btn.classList.add("auth-admin");
+    if (btn) { btn.textContent = "⎋ Salir"; btn.classList.add("auth-admin"); }
     document.getElementById("map").style.cursor = "";
     document.getElementById("hint").style.display = "";
   } else {
-    btn.textContent = "🔐";
-    btn.classList.remove("auth-admin");
+    if (btn) { btn.textContent = "🔐"; btn.classList.remove("auth-admin"); }
     document.getElementById("map").style.cursor = "grab";
     document.getElementById("hint").style.display = "none";
   }
